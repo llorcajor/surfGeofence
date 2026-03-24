@@ -1,0 +1,61 @@
+services:
+  # 1. Base de datos: MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: iot_mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
+  # 2. Broker MQTT: Mosquitto
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: iot_mosquitto
+    ports:
+      - "1883:1883" # MQTT
+      - "9001:9001" # WebSockets
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+
+  # 3. Backend: Node.js
+  backend:
+    build:
+      context: ./backend
+    container_name: iot_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/mi_base_datos
+      - MQTT_BROKER=mqtt://mosquitto:1883
+    volumes:
+      # Sincroniza tu código local con el contenedor (Hot reload)
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - mosquitto
+
+  # 4. Frontend: React
+  frontend:
+    build:
+      context: ./frontend
+    container_name: iot_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      # Variables de entorno para que React sepa dónde apuntar
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+# Declaración de volúmenes persistentes
+volumes:
+  mongodb_data:
+  mosquitto_data:
+  mosquitto_log:
